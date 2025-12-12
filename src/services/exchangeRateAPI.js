@@ -16,30 +16,35 @@ const API_BASE_URL = 'https://v6.exchangerate-api.com/v6'
  * @returns {Promise<number>} - Converted amount in USD
  */
 export async function convertCurrency(amount, fromCurrency, date) {
-  // Try multiple APIs in sequence
+  // Try multiple APIs in sequence with detailed logging
+  console.log('Starting currency conversion:', { amount, fromCurrency, date })
+  
   const apis = [
-    () => tryExchangeRateHost(amount, fromCurrency, date),
-    () => tryExchangeRateAPI(amount, fromCurrency, date),
-    () => tryFixerIO(amount, fromCurrency, date),
+    { name: 'exchangerate.host', fn: () => tryExchangeRateHost(amount, fromCurrency, date) },
+    { name: 'exchangerate-api.com', fn: () => tryExchangeRateAPI(amount, fromCurrency, date) },
+    { name: 'exchangerate.host convert', fn: () => tryFixerIO(amount, fromCurrency, date) },
   ]
 
   let lastError = null
   
-  for (const apiCall of apis) {
+  for (const api of apis) {
     try {
-      const result = await apiCall()
+      console.log(`Trying ${api.name}...`)
+      const result = await api.fn()
+      console.log(`Success with ${api.name}:`, result)
       return result
     } catch (error) {
-      console.error('API attempt failed:', error)
+      console.error(`${api.name} failed:`, error.message, error)
       lastError = error
       // Continue to next API
     }
   }
 
-  // All APIs failed
+  // All APIs failed - provide detailed error
   console.error('All API attempts failed. Last error:', lastError)
+  const errorMessage = lastError?.message || 'Unknown error'
   throw new Error(
-    'Unable to fetch exchange rate. Please check your internet connection and try again.'
+    `Unable to fetch exchange rate (${errorMessage}). Please check your internet connection and try again.`
   )
 }
 
