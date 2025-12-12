@@ -56,23 +56,37 @@ This app uses [exchangerate.host](https://exchangerate.host/) API for free histo
 
 ## Supported Currencies
 
-- EUR (Euro)
-- GBP (British Pound)
-- JPY (Japanese Yen)
-- AUD (Australian Dollar)
-- CAD (Canadian Dollar)
-- CHF (Swiss Franc)
-- CNY (Chinese Yuan)
-- INR (Indian Rupee)
-- MXN (Mexican Peso)
-- BRL (Brazilian Real)
-- ZAR (South African Rand)
-- KRW (South Korean Won)
-- SGD (Singapore Dollar)
-- HKD (Hong Kong Dollar)
-- NZD (New Zealand Dollar)
+The app supports 27 major currencies for conversion to USD:
 
-And many more through the API!
+- QAR (Qatari Riyal)
+- AED (United Arab Emirates Dirham)
+- AUD (Australian Dollar)
+- BHD (Bahraini Dinar)
+- EUR (Euro)
+- CAD (Canadian Dollar)
+- CNY (Chinese Yuan)
+- DKK (Danish Krone)
+- HKD (Hong Kong Dollar)
+- INR (Indian Rupee)
+- JPY (Japanese Yen)
+- KWD (Kuwaiti Dinar)
+- MOP (Macanese Pataca)
+- MYR (Malaysian Ringgit)
+- MXN (Mexican Peso)
+- NZD (New Zealand Dollar)
+- NOK (Norwegian Krone)
+- OMR (Omani Rial)
+- PEN (Peruvian Sol)
+- PHP (Philippine Peso)
+- SAR (Saudi Riyal)
+- SGD (Singapore Dollar)
+- KRW (South Korean Won)
+- CHF (Swiss Franc)
+- TWD (New Taiwan Dollar)
+- THB (Thai Baht)
+- GBP (British Pound)
+
+Exchange rates are displayed with 7 decimal places for precision.
 
 ## GitHub Pages Deployment
 

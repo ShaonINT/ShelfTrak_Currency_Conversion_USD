@@ -2,26 +2,38 @@ import { useState } from 'react'
 import { convertCurrency } from '../services/exchangeRateAPI'
 
 const CURRENCIES = [
-  { code: 'EUR', name: 'Euro' },
-  { code: 'GBP', name: 'British Pound' },
-  { code: 'JPY', name: 'Japanese Yen' },
+  { code: 'QAR', name: 'Qatari Riyal' },
+  { code: 'AED', name: 'United Arab Emirates Dirham' },
   { code: 'AUD', name: 'Australian Dollar' },
+  { code: 'BHD', name: 'Bahraini Dinar' },
+  { code: 'EUR', name: 'Euro' },
   { code: 'CAD', name: 'Canadian Dollar' },
-  { code: 'CHF', name: 'Swiss Franc' },
   { code: 'CNY', name: 'Chinese Yuan' },
-  { code: 'INR', name: 'Indian Rupee' },
-  { code: 'MXN', name: 'Mexican Peso' },
-  { code: 'BRL', name: 'Brazilian Real' },
-  { code: 'ZAR', name: 'South African Rand' },
-  { code: 'KRW', name: 'South Korean Won' },
-  { code: 'SGD', name: 'Singapore Dollar' },
+  { code: 'DKK', name: 'Danish Krone' },
   { code: 'HKD', name: 'Hong Kong Dollar' },
+  { code: 'INR', name: 'Indian Rupee' },
+  { code: 'JPY', name: 'Japanese Yen' },
+  { code: 'KWD', name: 'Kuwaiti Dinar' },
+  { code: 'MOP', name: 'Macanese Pataca' },
+  { code: 'MYR', name: 'Malaysian Ringgit' },
+  { code: 'MXN', name: 'Mexican Peso' },
   { code: 'NZD', name: 'New Zealand Dollar' },
+  { code: 'NOK', name: 'Norwegian Krone' },
+  { code: 'OMR', name: 'Omani Rial' },
+  { code: 'PEN', name: 'Peruvian Sol' },
+  { code: 'PHP', name: 'Philippine Peso' },
+  { code: 'SAR', name: 'Saudi Riyal' },
+  { code: 'SGD', name: 'Singapore Dollar' },
+  { code: 'KRW', name: 'South Korean Won' },
+  { code: 'CHF', name: 'Swiss Franc' },
+  { code: 'TWD', name: 'New Taiwan Dollar' },
+  { code: 'THB', name: 'Thai Baht' },
+  { code: 'GBP', name: 'British Pound' },
 ]
 
 function CurrencyConverter() {
   const [amount, setAmount] = useState('')
-  const [fromCurrency, setFromCurrency] = useState('EUR')
+  const [fromCurrency, setFromCurrency] = useState('QAR')
   const [date, setDate] = useState(new Date().toISOString().split('T')[0])
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -50,12 +62,13 @@ function CurrencyConverter() {
         fromCurrency,
         date
       )
+      const exchangeRate = convertedAmount / parseFloat(amount)
       setResult({
         originalAmount: parseFloat(amount),
         fromCurrency,
         convertedAmount,
         date,
-        exchangeRate: convertedAmount / parseFloat(amount),
+        exchangeRate: parseFloat(exchangeRate.toFixed(7)),
       })
     } catch (err) {
       setError(err.message || 'Failed to fetch exchange rate. Please try again.')
@@ -172,8 +185,8 @@ function CurrencyConverter() {
                 <span className="font-semibold text-gray-800">
                   1 {result.fromCurrency} ={' '}
                   {result.exchangeRate.toLocaleString('en-US', {
-                    minimumFractionDigits: 4,
-                    maximumFractionDigits: 4,
+                    minimumFractionDigits: 7,
+                    maximumFractionDigits: 7,
                   })}{' '}
                   USD
                 </span>
