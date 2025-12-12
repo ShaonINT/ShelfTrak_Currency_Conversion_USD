@@ -18,7 +18,7 @@ export async function convertCurrency(amount, fromCurrency, date) {
   
   // Only use APIs that support CORS (exchangerate-api.com has CORS issues)
   const apis = [
-    { name: 'exchangerate.host (date)', fn: () => tryExchangeRateHost(amount, fromCurrency, date) },
+    { name: 'exchangerate.host (timeseries)', fn: () => tryExchangeRateHost(amount, fromCurrency, date) },
     { name: 'exchangerate.host (convert)', fn: () => tryFixerIO(amount, fromCurrency, date) },
     { name: 'exchangerate.host (latest)', fn: () => tryExchangeRateHostLatest(amount, fromCurrency) },
   ]
@@ -51,7 +51,8 @@ export async function convertCurrency(amount, fromCurrency, date) {
  */
 async function tryExchangeRateHost(amount, fromCurrency, date) {
   const formattedDate = date
-  const url = `https://api.exchangerate.host/${formattedDate}?base=${fromCurrency}&symbols=USD`
+  // Use the timeseries endpoint which is more reliable
+  const url = `https://api.exchangerate.host/timeseries?start_date=${formattedDate}&end_date=${formattedDate}&base=${fromCurrency}&symbols=USD`
   
   const response = await fetch(url, {
     method: 'GET',
@@ -69,11 +70,14 @@ async function tryExchangeRateHost(amount, fromCurrency, date) {
     throw new Error(data.error?.info || 'API error')
   }
 
-  if (!data.rates || !data.rates.USD) {
+  // timeseries returns data.rates[date].USD
+  const dateKey = formattedDate
+  if (!data.rates || !data.rates[dateKey] || !data.rates[dateKey].USD) {
     throw new Error('USD rate not available')
   }
 
-  return amount * data.rates.USD
+  const exchangeRate = data.rates[dateKey].USD
+  return amount * exchangeRate
 }
 
 /**
@@ -106,16 +110,17 @@ async function tryExchangeRateHostLatest(amount, fromCurrency) {
 }
 
 /**
- * Try fixer.io format (alternative)
+ * Try exchangerate.host convert endpoint (alternative)
  */
 async function tryFixerIO(amount, fromCurrency, date) {
-  // Use exchangerate.host with different endpoint format
+  // Use exchangerate.host convert endpoint
   const formattedDate = date
   const url = `https://api.exchangerate.host/convert?from=${fromCurrency}&to=USD&amount=${amount}&date=${formattedDate}`
   
   const response = await fetch(url, {
     method: 'GET',
     mode: 'cors',
+    cache: 'no-cache',
   })
 
   if (!response.ok) {
