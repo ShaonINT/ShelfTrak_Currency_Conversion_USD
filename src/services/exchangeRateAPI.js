@@ -1,9 +1,10 @@
 /**
  * Exchange Rate API Service
  * 
- * This service uses exchangerate.host for free historical exchange rates.
- * exchangerate.host supports CORS and works perfectly with GitHub Pages.
+ * Uses multiple free APIs with CORS support for historical exchange rates.
  */
+
+const API_KEY = '12d80645fb41af2af60435c4c06bf9eb'
 
 /**
  * Converts currency to USD based on historical exchange rate
@@ -13,14 +14,14 @@
  * @returns {Promise<number>} - Converted amount in USD
  */
 export async function convertCurrency(amount, fromCurrency, date) {
-  // Try multiple CORS-friendly APIs in sequence
   console.log('Starting currency conversion:', { amount, fromCurrency, date })
   
-  // Only use APIs that support CORS (exchangerate-api.com has CORS issues)
+  // Try multiple APIs in sequence - all CORS-friendly
   const apis = [
-    { name: 'exchangerate.host (timeseries)', fn: () => tryExchangeRateHost(amount, fromCurrency, date) },
-    { name: 'exchangerate.host (convert)', fn: () => tryFixerIO(amount, fromCurrency, date) },
+    { name: 'exchangerate.host (date)', fn: () => tryExchangeRateHost(amount, fromCurrency, date) },
+    { name: 'exchangerate.host (convert)', fn: () => tryExchangeRateHostConvert(amount, fromCurrency, date) },
     { name: 'exchangerate.host (latest)', fn: () => tryExchangeRateHostLatest(amount, fromCurrency) },
+    { name: 'frankfurter.app (free)', fn: () => tryFrankfurter(amount, fromCurrency, date) },
   ]
 
   let lastError = null
@@ -32,27 +33,27 @@ export async function convertCurrency(amount, fromCurrency, date) {
       console.log(`Success with ${api.name}:`, result)
       return result
     } catch (error) {
-      console.error(`${api.name} failed:`, error.message, error)
+      console.error(`${api.name} failed:`, error.message)
       lastError = error
       // Continue to next API
     }
   }
 
-  // All APIs failed - provide detailed error
+  // All APIs failed
   console.error('All API attempts failed. Last error:', lastError)
   const errorMessage = lastError?.message || 'Unknown error'
   throw new Error(
-    `Unable to fetch exchange rate (${errorMessage}). Please check your internet connection and try again.`
+    `Unable to fetch exchange rate. ${errorMessage}`
   )
 }
 
 /**
- * Try exchangerate.host API
+ * Try exchangerate.host API - using simple date endpoint
  */
 async function tryExchangeRateHost(amount, fromCurrency, date) {
   const formattedDate = date
-  // Use the timeseries endpoint which is more reliable
-  const url = `https://api.exchangerate.host/timeseries?start_date=${formattedDate}&end_date=${formattedDate}&base=${fromCurrency}&symbols=USD`
+  // Try the simple date endpoint first
+  const url = `https://api.exchangerate.host/${formattedDate}?base=${fromCurrency}&symbols=USD`
   
   const response = await fetch(url, {
     method: 'GET',
@@ -70,14 +71,11 @@ async function tryExchangeRateHost(amount, fromCurrency, date) {
     throw new Error(data.error?.info || 'API error')
   }
 
-  // timeseries returns data.rates[date].USD
-  const dateKey = formattedDate
-  if (!data.rates || !data.rates[dateKey] || !data.rates[dateKey].USD) {
+  if (!data.rates || !data.rates.USD) {
     throw new Error('USD rate not available')
   }
 
-  const exchangeRate = data.rates[dateKey].USD
-  return amount * exchangeRate
+  return amount * data.rates.USD
 }
 
 /**
@@ -112,8 +110,7 @@ async function tryExchangeRateHostLatest(amount, fromCurrency) {
 /**
  * Try exchangerate.host convert endpoint (alternative)
  */
-async function tryFixerIO(amount, fromCurrency, date) {
-  // Use exchangerate.host convert endpoint
+async function tryExchangeRateHostConvert(amount, fromCurrency, date) {
   const formattedDate = date
   const url = `https://api.exchangerate.host/convert?from=${fromCurrency}&to=USD&amount=${amount}&date=${formattedDate}`
   
@@ -134,6 +131,32 @@ async function tryFixerIO(amount, fromCurrency, date) {
   }
 
   return data.result
+}
+
+/**
+ * Try frankfurter.app - free API with CORS support
+ */
+async function tryFrankfurter(amount, fromCurrency, date) {
+  const formattedDate = date
+  const url = `https://api.frankfurter.app/${formattedDate}?from=${fromCurrency}&to=USD`
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    mode: 'cors',
+    cache: 'no-cache',
+  })
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+
+  const data = await response.json()
+
+  if (!data.rates || !data.rates.USD) {
+    throw new Error('USD rate not available')
+  }
+
+  return amount * data.rates.USD
 }
 
 
