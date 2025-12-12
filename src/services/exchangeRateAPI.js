@@ -54,14 +54,13 @@ export async function convertCurrency(amount, fromCurrency, date) {
 }
 
 /**
- * Alternative API using exchangerate-api.com through CORS proxy or direct call
+ * Alternative API using exchangerate-api.com through CORS proxy
  */
 async function tryAlternativeAPI(amount, fromCurrency, date, isFutureDate) {
-  // Use exchangerate-api.com with your API key
-  // Since it has CORS issues, we'll try it anyway - some browsers might allow it
   const API_KEY = '12d80645fb41af2af60435c4c06bf9eb'
   const API_BASE_URL = 'https://v6.exchangerate-api.com/v6'
   
+  // Try direct call first (might work in some cases)
   let apiUrl
   if (isFutureDate) {
     apiUrl = `${API_BASE_URL}/${API_KEY}/latest/${fromCurrency}`
@@ -69,23 +68,44 @@ async function tryAlternativeAPI(amount, fromCurrency, date, isFutureDate) {
     apiUrl = `${API_BASE_URL}/${API_KEY}/history/${date}/${fromCurrency}`
   }
   
-  const response = await fetch(apiUrl, {
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+      },
+      mode: 'cors',
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      if (data.result === 'error') {
+        throw new Error(data['error-type'] || 'API error')
+      }
+      if (data.conversion_rates && data.conversion_rates.USD) {
+        return amount * data.conversion_rates.USD
+      }
+    }
+  } catch (corsError) {
+    console.log('Direct API call failed (CORS), trying CORS proxy...')
+  }
+  
+  // If direct call fails due to CORS, try through a CORS proxy
+  // Using a public CORS proxy service
+  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`
+  
+  const response = await fetch(proxyUrl, {
     method: 'GET',
-    headers: {
-      'Accept': 'application/json',
-    },
     mode: 'cors',
   })
 
   if (!response.ok) {
-    // If CORS fails, try latest as fallback
+    // Try latest as fallback
     if (!isFutureDate) {
-      apiUrl = `${API_BASE_URL}/${API_KEY}/latest/${fromCurrency}`
-      const latestResponse = await fetch(apiUrl, {
+      const latestUrl = `${API_BASE_URL}/${API_KEY}/latest/${fromCurrency}`
+      const proxyLatestUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(latestUrl)}`
+      const latestResponse = await fetch(proxyLatestUrl, {
         method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
         mode: 'cors',
       })
       
