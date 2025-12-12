@@ -16,13 +16,14 @@ const API_BASE_URL = 'https://v6.exchangerate-api.com/v6'
  * @returns {Promise<number>} - Converted amount in USD
  */
 export async function convertCurrency(amount, fromCurrency, date) {
-  // Try multiple APIs in sequence with detailed logging
+  // Try multiple CORS-friendly APIs in sequence
   console.log('Starting currency conversion:', { amount, fromCurrency, date })
   
+  // Only use APIs that support CORS (exchangerate-api.com has CORS issues)
   const apis = [
-    { name: 'exchangerate.host', fn: () => tryExchangeRateHost(amount, fromCurrency, date) },
-    { name: 'exchangerate-api.com', fn: () => tryExchangeRateAPI(amount, fromCurrency, date) },
-    { name: 'exchangerate.host convert', fn: () => tryFixerIO(amount, fromCurrency, date) },
+    { name: 'exchangerate.host (date)', fn: () => tryExchangeRateHost(amount, fromCurrency, date) },
+    { name: 'exchangerate.host (convert)', fn: () => tryFixerIO(amount, fromCurrency, date) },
+    { name: 'exchangerate.host (latest)', fn: () => tryExchangeRateHostLatest(amount, fromCurrency) },
   ]
 
   let lastError = null
@@ -79,48 +80,32 @@ async function tryExchangeRateHost(amount, fromCurrency, date) {
 }
 
 /**
- * Try exchangerate-api.com with API key
+ * Try exchangerate.host with latest rates (fallback if historical fails)
  */
-async function tryExchangeRateAPI(amount, fromCurrency, date) {
-  // Try latest endpoint first (more reliable)
-  let apiUrl = `${API_BASE_URL}/${API_KEY}/latest/${fromCurrency}`
+async function tryExchangeRateHostLatest(amount, fromCurrency) {
+  const url = `https://api.exchangerate.host/latest?base=${fromCurrency}&symbols=USD`
   
-  let response = await fetch(apiUrl, {
+  const response = await fetch(url, {
     method: 'GET',
-    headers: {
-      'Accept': 'application/json',
-    },
     mode: 'cors',
+    cache: 'no-cache',
   })
 
-  // If latest works, use it; otherwise try historical
   if (!response.ok) {
-    const formattedDate = date
-    apiUrl = `${API_BASE_URL}/${API_KEY}/history/${formattedDate}/${fromCurrency}`
-    response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
-      mode: 'cors',
-    })
-  }
-
-  if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`)
+    throw new Error(`HTTP ${response.status}`)
   }
 
   const data = await response.json()
 
-  if (data.result === 'error') {
-    throw new Error(data['error-type'] || 'API error')
+  if (data.success === false) {
+    throw new Error(data.error?.info || 'API error')
   }
 
-  if (!data.conversion_rates || !data.conversion_rates.USD) {
+  if (!data.rates || !data.rates.USD) {
     throw new Error('USD rate not available')
   }
 
-  return amount * data.conversion_rates.USD
+  return amount * data.rates.USD
 }
 
 /**
