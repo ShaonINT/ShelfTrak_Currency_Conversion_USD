@@ -16,59 +16,69 @@ const API_BASE_URL = 'https://v6.exchangerate-api.com/v6'
  * @returns {Promise<number>} - Converted amount in USD
  */
 export async function convertCurrency(amount, fromCurrency, date) {
-  // Try exchangerate.host first (free, reliable, good CORS support)
-  try {
-    const formattedDate = date
-    const url = `https://api.exchangerate.host/${formattedDate}?base=${fromCurrency}&symbols=USD`
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      mode: 'cors',
-      cache: 'no-cache',
-    })
+  // Try multiple APIs in sequence
+  const apis = [
+    () => tryExchangeRateHost(amount, fromCurrency, date),
+    () => tryExchangeRateAPI(amount, fromCurrency, date),
+    () => tryFixerIO(amount, fromCurrency, date),
+  ]
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
-    }
-
-    const data = await response.json()
-
-    // exchangerate.host returns success flag
-    if (data.success === false) {
-      throw new Error(data.error?.info || 'API returned error')
-    }
-
-    if (!data.rates || !data.rates.USD) {
-      throw new Error('USD rate not available')
-    }
-
-    const exchangeRate = data.rates.USD
-    const convertedAmount = amount * exchangeRate
-
-    return convertedAmount
-  } catch (error) {
-    console.log('exchangerate.host failed, trying exchangerate-api.com...', error)
-    
-    // Fallback to exchangerate-api.com
+  let lastError = null
+  
+  for (const apiCall of apis) {
     try {
-      return await convertWithExchangeRateAPI(amount, fromCurrency, date)
-    } catch (fallbackError) {
-      console.error('All APIs failed:', fallbackError)
-      throw new Error(
-        'Unable to fetch exchange rate. Please check your internet connection and try again.'
-      )
+      const result = await apiCall()
+      return result
+    } catch (error) {
+      console.error('API attempt failed:', error)
+      lastError = error
+      // Continue to next API
     }
   }
+
+  // All APIs failed
+  console.error('All API attempts failed. Last error:', lastError)
+  throw new Error(
+    'Unable to fetch exchange rate. Please check your internet connection and try again.'
+  )
 }
 
 /**
- * Fallback API using exchangerate-api.com
+ * Try exchangerate.host API
  */
-async function convertWithExchangeRateAPI(amount, fromCurrency, date) {
+async function tryExchangeRateHost(amount, fromCurrency, date) {
   const formattedDate = date
+  const url = `https://api.exchangerate.host/${formattedDate}?base=${fromCurrency}&symbols=USD`
   
-  // Try historical endpoint first
-  let apiUrl = `${API_BASE_URL}/${API_KEY}/history/${formattedDate}/${fromCurrency}`
+  const response = await fetch(url, {
+    method: 'GET',
+    mode: 'cors',
+    cache: 'no-cache',
+  })
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+
+  const data = await response.json()
+
+  if (data.success === false) {
+    throw new Error(data.error?.info || 'API error')
+  }
+
+  if (!data.rates || !data.rates.USD) {
+    throw new Error('USD rate not available')
+  }
+
+  return amount * data.rates.USD
+}
+
+/**
+ * Try exchangerate-api.com with API key
+ */
+async function tryExchangeRateAPI(amount, fromCurrency, date) {
+  // Try latest endpoint first (more reliable)
+  let apiUrl = `${API_BASE_URL}/${API_KEY}/latest/${fromCurrency}`
   
   let response = await fetch(apiUrl, {
     method: 'GET',
@@ -78,9 +88,10 @@ async function convertWithExchangeRateAPI(amount, fromCurrency, date) {
     mode: 'cors',
   })
 
-  // If historical fails, try latest
+  // If latest works, use it; otherwise try historical
   if (!response.ok) {
-    apiUrl = `${API_BASE_URL}/${API_KEY}/latest/${fromCurrency}`
+    const formattedDate = date
+    apiUrl = `${API_BASE_URL}/${API_KEY}/history/${formattedDate}/${fromCurrency}`
     response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
@@ -104,9 +115,35 @@ async function convertWithExchangeRateAPI(amount, fromCurrency, date) {
     throw new Error('USD rate not available')
   }
 
-  const exchangeRate = data.conversion_rates.USD
-  return amount * exchangeRate
+  return amount * data.conversion_rates.USD
 }
+
+/**
+ * Try fixer.io format (alternative)
+ */
+async function tryFixerIO(amount, fromCurrency, date) {
+  // Use exchangerate.host with different endpoint format
+  const formattedDate = date
+  const url = `https://api.exchangerate.host/convert?from=${fromCurrency}&to=USD&amount=${amount}&date=${formattedDate}`
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    mode: 'cors',
+  })
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+
+  const data = await response.json()
+
+  if (data.success === false || !data.result) {
+    throw new Error('Conversion failed')
+  }
+
+  return data.result
+}
+
 
 /**
  * Get available currencies
