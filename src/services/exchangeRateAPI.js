@@ -2,11 +2,8 @@
  * Exchange Rate API Service
  * 
  * This service uses exchangerate.host for free historical exchange rates.
- * Falls back to exchangerate-api.com if needed.
+ * exchangerate.host supports CORS and works perfectly with GitHub Pages.
  */
-
-const API_KEY = '12d80645fb41af2af60435c4c06bf9eb'
-const API_BASE_URL = 'https://v6.exchangerate-api.com/v6'
 
 /**
  * Converts currency to USD based on historical exchange rate
@@ -141,16 +138,20 @@ async function tryFixerIO(amount, fromCurrency, date) {
  */
 export async function getAvailableCurrencies() {
   try {
-    // Get latest rates to see available currencies
-    const response = await fetch(`${API_BASE_URL}/${API_KEY}/latest/USD`)
+    // Get latest rates to see available currencies using CORS-friendly API
+    const response = await fetch('https://api.exchangerate.host/latest?base=USD', {
+      method: 'GET',
+      mode: 'cors',
+    })
+    
     const data = await response.json()
 
-    if (data.result === 'error') {
-      throw new Error(data['error-type'] || 'Failed to fetch currencies')
+    if (data.success === false) {
+      throw new Error(data.error?.info || 'Failed to fetch currencies')
     }
 
     // Return conversion rates as available currencies
-    return data.conversion_rates || {}
+    return data.rates || {}
   } catch (error) {
     throw new Error('Failed to fetch available currencies')
   }
