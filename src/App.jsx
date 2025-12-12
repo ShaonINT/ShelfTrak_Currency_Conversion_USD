@@ -5,8 +5,8 @@ function App() {
     <div className="min-h-screen bg-gray-50">
       {/* Header matching Shelftrak style */}
       <header className="bg-slate-900 text-white shadow-sm">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-center">
+        <div className="w-full px-6 py-4">
+          <div className="flex items-center justify-center w-full">
             <div className="flex items-center space-x-2">
               <h1 className="text-2xl font-bold tracking-tight">Shelftrak</h1>
               <span className="text-slate-400 text-sm font-medium">Currency Conversion USD</span>
