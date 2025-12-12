@@ -17,11 +17,12 @@ export async function convertCurrency(amount, fromCurrency, date) {
   console.log('Starting currency conversion:', { amount, fromCurrency, date })
   
   // Try multiple APIs in sequence - all CORS-friendly
+  // Start with most reliable APIs first
   const apis = [
+    { name: 'frankfurter.app', fn: () => tryFrankfurter(amount, fromCurrency, date) },
+    { name: 'exchangerate.host (latest)', fn: () => tryExchangeRateHostLatest(amount, fromCurrency) },
     { name: 'exchangerate.host (date)', fn: () => tryExchangeRateHost(amount, fromCurrency, date) },
     { name: 'exchangerate.host (convert)', fn: () => tryExchangeRateHostConvert(amount, fromCurrency, date) },
-    { name: 'exchangerate.host (latest)', fn: () => tryExchangeRateHostLatest(amount, fromCurrency) },
-    { name: 'frankfurter.app (free)', fn: () => tryFrankfurter(amount, fromCurrency, date) },
   ]
 
   let lastError = null
@@ -52,7 +53,17 @@ export async function convertCurrency(amount, fromCurrency, date) {
  */
 async function tryExchangeRateHost(amount, fromCurrency, date) {
   const formattedDate = date
-  // Try the simple date endpoint first
+  
+  // Check if date is in the future - if so, use latest instead
+  const selectedDate = new Date(formattedDate)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  if (selectedDate > today) {
+    throw new Error('Date is in the future, using latest rates')
+  }
+  
+  // Try the simple date endpoint
   const url = `https://api.exchangerate.host/${formattedDate}?base=${fromCurrency}&symbols=USD`
   
   const response = await fetch(url, {
@@ -134,11 +145,23 @@ async function tryExchangeRateHostConvert(amount, fromCurrency, date) {
 }
 
 /**
- * Try frankfurter.app - free API with CORS support
+ * Try frankfurter.app - free API with CORS support (most reliable)
  */
 async function tryFrankfurter(amount, fromCurrency, date) {
   const formattedDate = date
-  const url = `https://api.frankfurter.app/${formattedDate}?from=${fromCurrency}&to=USD`
+  
+  // Check if date is in the future - frankfurter doesn't support future dates
+  const selectedDate = new Date(formattedDate)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  let url
+  if (selectedDate > today) {
+    // Use latest endpoint for future dates
+    url = `https://api.frankfurter.app/latest?from=${fromCurrency}&to=USD`
+  } else {
+    url = `https://api.frankfurter.app/${formattedDate}?from=${fromCurrency}&to=USD`
+  }
   
   const response = await fetch(url, {
     method: 'GET',
