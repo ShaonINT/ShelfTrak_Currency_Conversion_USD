@@ -19,7 +19,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
       
       - name: Setup Node.js
@@ -29,17 +29,28 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
-        run: npm install
+        run: |
+          echo "Installing dependencies..."
+          npm install
+          echo "Dependencies installed successfully"
       
-      - name: Build
-        run: npm run build
+      - name: Build project
+        run: |
+          echo "Building project..."
+          npm run build
+          echo "Build completed"
         env:
           NODE_ENV: production
       
       - name: Verify build output
         run: |
+          echo "Checking build output..."
+          if [ ! -d "dist" ]; then
+            echo "ERROR: dist directory not found!"
+            exit 1
+          fi
           ls -la dist/
-          echo "Build completed successfully"
+          echo "Build output verified successfully"
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
