@@ -1,4 +1,4 @@
-# Currency Conversion App
+# ShelfTrak Currency Conversion USD
 
 A modern web application that converts any currency to USD based on historical exchange rates for a specific date.
 
@@ -9,6 +9,7 @@ A modern web application that converts any currency to USD based on historical e
 - Clean, modern user interface
 - Real-time conversion with exchange rate display
 - Support for 15+ major currencies
+- Deployed on GitHub Pages
 
 ## Getting Started
 
@@ -73,14 +74,24 @@ This app uses [exchangerate.host](https://exchangerate.host/) API for free histo
 
 And many more through the API!
 
+## GitHub Pages Deployment
+
+This app is automatically deployed to GitHub Pages using GitHub Actions. The workflow triggers on every push to the `main` branch.
+
+To enable GitHub Pages:
+1. Go to your repository settings on GitHub
+2. Navigate to "Pages" in the left sidebar
+3. Under "Source", select "GitHub Actions"
+4. The app will be available at: `https://shaonint.github.io/ShelfTrak_Currency_Conversion_USD/`
+
 ## Technologies Used
 
 - React 18
 - Vite
 - Tailwind CSS
 - exchangerate.host API
+- GitHub Actions (for CI/CD)
 
 ## License
 
 MIT
-
