@@ -54,82 +54,94 @@ export async function convertCurrency(amount, fromCurrency, date) {
 }
 
 /**
- * Alternative API using exchangerate-api.com through CORS proxy
+ * Alternative API using exchangerate.host with correct API format
+ * Based on official API documentation: http://api.exchangerate.host/
+ * Format: historical?access_key=KEY&date=YYYY-MM-DD&source=CURRENCY&currencies=USD&format=1
  */
 async function tryAlternativeAPI(amount, fromCurrency, date, isFutureDate) {
   const API_KEY = '12d80645fb41af2af60435c4c06bf9eb'
-  const API_BASE_URL = 'https://v6.exchangerate-api.com/v6'
+  const BASE_URL = 'http://api.exchangerate.host'
   
-  // Try direct call first (might work in some cases)
-  let apiUrl
-  if (isFutureDate) {
-    apiUrl = `${API_BASE_URL}/${API_KEY}/latest/${fromCurrency}`
-  } else {
-    apiUrl = `${API_BASE_URL}/${API_KEY}/history/${date}/${fromCurrency}`
+  // Try 1: Historical endpoint (for past dates)
+  if (!isFutureDate) {
+    try {
+      // Format: historical?access_key=KEY&date=YYYY-MM-DD&source=CURRENCY&currencies=USD&format=1
+      const historicalUrl = `${BASE_URL}/historical?access_key=${API_KEY}&date=${date}&source=${fromCurrency}&currencies=USD&format=1`
+      
+      const response = await fetch(historicalUrl, {
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-cache',
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        
+        // Response format: { success: true, quotes: { "QARUSD": rate } }
+        if (data.success === true && data.quotes) {
+          const quoteKey = `${fromCurrency}USD`
+          if (data.quotes[quoteKey]) {
+            console.log('exchangerate.host (historical) succeeded')
+            return amount * data.quotes[quoteKey]
+          }
+        }
+      }
+    } catch (error) {
+      console.log('exchangerate.host historical failed, trying live endpoint...', error.message)
+    }
   }
   
+  // Try 2: Live endpoint (for latest rates or fallback)
   try {
-    const response = await fetch(apiUrl, {
+    // Format: live?access_key=KEY&source=CURRENCY&currencies=USD&format=1
+    const liveUrl = `${BASE_URL}/live?access_key=${API_KEY}&source=${fromCurrency}&currencies=USD&format=1`
+    
+    const response = await fetch(liveUrl, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
       mode: 'cors',
+      cache: 'no-cache',
     })
 
     if (response.ok) {
       const data = await response.json()
-      if (data.result === 'error') {
-        throw new Error(data['error-type'] || 'API error')
-      }
-      if (data.conversion_rates && data.conversion_rates.USD) {
-        return amount * data.conversion_rates.USD
-      }
-    }
-  } catch (corsError) {
-    console.log('Direct API call failed (CORS), trying CORS proxy...')
-  }
-  
-  // If direct call fails due to CORS, try through a CORS proxy
-  // Using a public CORS proxy service
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`
-  
-  const response = await fetch(proxyUrl, {
-    method: 'GET',
-    mode: 'cors',
-  })
-
-  if (!response.ok) {
-    // Try latest as fallback
-    if (!isFutureDate) {
-      const latestUrl = `${API_BASE_URL}/${API_KEY}/latest/${fromCurrency}`
-      const proxyLatestUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(latestUrl)}`
-      const latestResponse = await fetch(proxyLatestUrl, {
-        method: 'GET',
-        mode: 'cors',
-      })
       
-      if (latestResponse.ok) {
-        const data = await latestResponse.json()
-        if (data.conversion_rates && data.conversion_rates.USD) {
-          return amount * data.conversion_rates.USD
+      // Response format: { success: true, quotes: { "QARUSD": rate } }
+      if (data.success === true && data.quotes) {
+        const quoteKey = `${fromCurrency}USD`
+        if (data.quotes[quoteKey]) {
+          console.log('exchangerate.host (live) succeeded')
+          return amount * data.quotes[quoteKey]
         }
       }
     }
-    throw new Error(`API request failed: ${response.status}`)
+  } catch (error) {
+    console.log('exchangerate.host live failed:', error.message)
   }
+  
+  // Try 3: Convert endpoint (alternative method)
+  try {
+    // Format: convert?access_key=KEY&from=CURRENCY&to=USD&amount=AMOUNT
+    const convertUrl = `${BASE_URL}/convert?access_key=${API_KEY}&from=${fromCurrency}&to=USD&amount=${amount}`
+    
+    const response = await fetch(convertUrl, {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'no-cache',
+    })
 
-  const data = await response.json()
-
-  if (data.result === 'error') {
-    throw new Error(data['error-type'] || 'API error')
+    if (response.ok) {
+      const data = await response.json()
+      
+      if (data.success === true && data.result !== undefined) {
+        console.log('exchangerate.host (convert) succeeded')
+        return data.result
+      }
+    }
+  } catch (error) {
+    console.log('exchangerate.host convert failed:', error.message)
   }
-
-  if (!data.conversion_rates || !data.conversion_rates.USD) {
-    throw new Error('USD rate not available')
-  }
-
-  return amount * data.conversion_rates.USD
+  
+  throw new Error('All exchangerate.host endpoints failed')
 }
 
 /**

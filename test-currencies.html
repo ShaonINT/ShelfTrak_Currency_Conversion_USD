@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Currency API Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1e293b;
+            margin-bottom: 20px;
+        }
+        .test-button {
+            background: #1e293b;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        .test-button:hover {
+            background: #334155;
+        }
+        .test-button:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        .currency-test {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 4px solid #ccc;
+        }
+        .currency-test.success {
+            background: #f0fdf4;
+            border-color: #22c55e;
+        }
+        .currency-test.failed {
+            background: #fef2f2;
+            border-color: #ef4444;
+        }
+        .currency-test.partial {
+            background: #fffbeb;
+            border-color: #f59e0b;
+        }
+        .summary {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8fafc;
+            border-radius: 6px;
+        }
+        .summary h2 {
+            margin-top: 0;
+            color: #1e293b;
+        }
+        .stat {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+        }
+        .loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #1e293b;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Currency API Test - All 27 Currencies</h1>
+        <button class="test-button" id="testBtn" onclick="runTests()">Start Testing</button>
+        <div id="results" class="results"></div>
+        <div id="summary" class="summary" style="display: none;"></div>
+    </div>
+
+    <script>
+        const CURRENCIES = [
+            'QAR', 'AED', 'AUD', 'BHD', 'EUR', 'CAD', 'CNY', 'DKK', 'HKD', 'INR',
+            'JPY', 'KWD', 'MOP', 'MYR', 'MXN', 'NZD', 'NOK', 'OMR', 'PEN', 'PHP',
+            'SAR', 'SGD', 'KRW', 'CHF', 'TWD', 'THB', 'GBP'
+        ];
+
+
+        async function testFrankfurter(currency) {
+            try {
+                const url = `https://api.frankfurter.app/latest?from=${currency}&to=USD`;
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    return { success: false, error: `HTTP ${response.status}` };
+                }
+                
+                const data = await response.json();
+                if (data.rates && data.rates.USD) {
+                    return { success: true, rate: data.rates.USD };
+                }
+                return { success: false, error: 'USD rate not found' };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        async function testExchangeRateHost(currency) {
+            const API_KEY = '12d80645fb41af2af60435c4c06bf9eb';
+            const BASE_URL = 'http://api.exchangerate.host';
+            
+            // Try live endpoint (latest rates)
+            try {
+                const liveUrl = `${BASE_URL}/live?access_key=${API_KEY}&source=${currency}&currencies=USD&format=1`;
+                const response = await fetch(liveUrl, {
+                    method: 'GET',
+                    mode: 'cors',
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Response format: { success: true, quotes: { "QARUSD": rate } }
+                    if (data.success === true && data.quotes) {
+                        const quoteKey = `${currency}USD`;
+                        if (data.quotes[quoteKey]) {
+                            return { success: true, rate: data.quotes[quoteKey] };
+                        }
+                    }
+                }
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+            
+            return { success: false, error: 'API request failed' };
+        }
+
+        async function runTests() {
+            const btn = document.getElementById('testBtn');
+            const resultsDiv = document.getElementById('results');
+            const summaryDiv = document.getElementById('summary');
+            
+            btn.disabled = true;
+            btn.textContent = 'Testing...';
+            resultsDiv.innerHTML = '';
+            summaryDiv.style.display = 'none';
+
+            const results = {
+                frankfurter: { success: [], failed: [] },
+                exchangerate: { success: [], failed: [] },
+                bothWork: [],
+                onlyFrankfurter: [],
+                onlyExchangeRate: [],
+                neitherWork: []
+            };
+
+            for (const currency of CURRENCIES) {
+                const currencyDiv = document.createElement('div');
+                currencyDiv.className = 'currency-test';
+                currencyDiv.id = `test-${currency}`;
+                currencyDiv.innerHTML = `<strong>${currency}</strong>: <span class="loading"></span> Testing...`;
+                resultsDiv.appendChild(currencyDiv);
+
+                const frankfurterResult = await testFrankfurter(currency);
+                const exchangerateResult = await testExchangeRateHost(currency);
+
+                let status = '';
+                let className = '';
+
+                if (frankfurterResult.success && exchangerateResult.success) {
+                    results.bothWork.push(currency);
+                    status = `✓ Both APIs work | frankfurter: ${frankfurterResult.rate.toFixed(7)} | exchangerate: ${exchangerateResult.rate.toFixed(7)}`;
+                    className = 'success';
+                } else if (frankfurterResult.success) {
+                    results.onlyFrankfurter.push(currency);
+                    results.frankfurter.success.push(currency);
+                    status = `✓ frankfurter.app works (${frankfurterResult.rate.toFixed(7)}) | ✗ exchangerate-api.com: ${exchangerateResult.error}`;
+                    className = 'partial';
+                } else if (exchangerateResult.success) {
+                    results.onlyExchangeRate.push(currency);
+                    results.exchangerate.success.push(currency);
+                    status = `✗ frankfurter.app: ${frankfurterResult.error} | ✓ exchangerate.host works (${exchangerateResult.rate.toFixed(7)})`;
+                    className = 'partial';
+                } else {
+                    results.neitherWork.push(currency);
+                    results.frankfurter.failed.push(currency);
+                    results.exchangerate.failed.push(currency);
+                    status = `✗ Both failed | frankfurter: ${frankfurterResult.error} | exchangerate.host: ${exchangerateResult.error}`;
+                    className = 'failed';
+                }
+
+                if (frankfurterResult.success) results.frankfurter.success.push(currency);
+                else results.frankfurter.failed.push(currency);
+
+                if (exchangerateResult.success) results.exchangerate.success.push(currency);
+                else results.exchangerate.failed.push(currency);
+
+                currencyDiv.className = `currency-test ${className}`;
+                currencyDiv.innerHTML = `<strong>${currency}</strong>: ${status}`;
+
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+
+            // Show summary
+            summaryDiv.style.display = 'block';
+            summaryDiv.innerHTML = `
+                <h2>Test Summary</h2>
+                <div class="stat">
+                    <strong>Total currencies:</strong> ${CURRENCIES.length}
+                </div>
+                <div class="stat">
+                    <strong>frankfurter.app working:</strong> ${results.frankfurter.success.length} 
+                    (${results.frankfurter.success.join(', ')})
+                </div>
+                <div class="stat">
+                    <strong>frankfurter.app failed:</strong> ${results.frankfurter.failed.length} 
+                    (${results.frankfurter.failed.join(', ')})
+                </div>
+                <div class="stat">
+                    <strong>exchangerate.host working:</strong> ${results.exchangerate.success.length} 
+                    (${results.exchangerate.success.join(', ')})
+                </div>
+                <div class="stat">
+                    <strong>exchangerate.host failed:</strong> ${results.exchangerate.failed.length} 
+                    (${results.exchangerate.failed.join(', ')})
+                </div>
+                <div class="stat">
+                    <strong>Both APIs work:</strong> ${results.bothWork.length} (${results.bothWork.join(', ')})
+                </div>
+                <div class="stat">
+                    <strong>Only frankfurter.app works:</strong> ${results.onlyFrankfurter.length} 
+                    (${results.onlyFrankfurter.join(', ')})
+                </div>
+                <div class="stat">
+                    <strong>Only exchangerate.host works:</strong> ${results.onlyExchangeRate.length} 
+                    (${results.onlyExchangeRate.join(', ')})
+                </div>
+                <div class="stat" style="background: ${results.neitherWork.length > 0 ? '#fee2e2' : '#dcfce7'};">
+                    <strong>Neither API works:</strong> ${results.neitherWork.length} 
+                    ${results.neitherWork.length > 0 ? `⚠️ (${results.neitherWork.join(', ')})` : '✅'}
+                </div>
+            `;
+
+            btn.disabled = false;
+            btn.textContent = 'Test Again';
+        }
+    </script>
+</body>
+</html>
+
