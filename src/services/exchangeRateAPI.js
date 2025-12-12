@@ -1,14 +1,12 @@
 /**
  * Exchange Rate API Service
  * 
- * This service uses exchangerate-api.com which provides free historical exchange rates.
- * For production use, you may want to:
- * 1. Sign up for a free API key at https://www.exchangerate-api.com/
- * 2. Replace the base URL with your API key
- * 3. Or use another service like fixer.io, exchangerate.host, etc.
+ * This service uses exchangerate-api.com v6 for historical exchange rates.
+ * API Documentation: https://www.exchangerate-api.com/docs/overview
  */
 
-const API_BASE_URL = 'https://api.exchangerate-api.com/v4'
+const API_KEY = '12d80645fb41af2af60435c4c06bf9eb'
+const API_BASE_URL = 'https://v6.exchangerate-api.com/v6'
 
 /**
  * Converts currency to USD based on historical exchange rate
@@ -22,33 +20,39 @@ export async function convertCurrency(amount, fromCurrency, date) {
     // Format date for API (YYYY-MM-DD)
     const formattedDate = date
 
-    // exchangerate-api.com v4 doesn't support historical dates directly
-    // We'll use exchangerate.host which provides free historical data
+    // Use exchangerate-api.com v6 for historical rates
+    // Format: /v6/{api_key}/history/{date}/{base_currency}
     const response = await fetch(
-      `https://api.exchangerate.host/${formattedDate}?base=${fromCurrency}&symbols=USD`
+      `${API_BASE_URL}/${API_KEY}/history/${formattedDate}/${fromCurrency}`
     )
 
     if (!response.ok) {
+      // If historical endpoint fails, try latest rates as fallback
+      if (response.status === 404 || response.status === 400) {
+        throw new Error('Historical data not available for this date. Please try a different date.')
+      }
       throw new Error('Failed to fetch exchange rate')
     }
 
     const data = await response.json()
 
-    if (!data.success && data.success !== undefined) {
-      throw new Error(data.error?.info || 'Failed to fetch exchange rate')
+    // Check for API errors
+    if (data.result === 'error') {
+      throw new Error(data['error-type'] || 'Failed to fetch exchange rate')
     }
 
-    if (!data.rates || !data.rates.USD) {
+    // exchangerate-api.com returns rates object with target currencies
+    if (!data.conversion_rates || !data.conversion_rates.USD) {
       throw new Error('USD rate not available for the selected date')
     }
 
-    const exchangeRate = data.rates.USD
+    const exchangeRate = data.conversion_rates.USD
     const convertedAmount = amount * exchangeRate
 
     return convertedAmount
   } catch (error) {
-    // Fallback: Try alternative API
-    if (error.message.includes('Failed to fetch')) {
+    // Enhanced error handling
+    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
       throw new Error(
         'Network error. Please check your internet connection and try again.'
       )
@@ -63,14 +67,16 @@ export async function convertCurrency(amount, fromCurrency, date) {
  */
 export async function getAvailableCurrencies() {
   try {
-    const response = await fetch('https://api.exchangerate.host/symbols')
+    // Get latest rates to see available currencies
+    const response = await fetch(`${API_BASE_URL}/${API_KEY}/latest/USD`)
     const data = await response.json()
 
-    if (!data.success) {
-      throw new Error('Failed to fetch currencies')
+    if (data.result === 'error') {
+      throw new Error(data['error-type'] || 'Failed to fetch currencies')
     }
 
-    return data.symbols
+    // Return conversion rates as available currencies
+    return data.conversion_rates || {}
   } catch (error) {
     throw new Error('Failed to fetch available currencies')
   }
